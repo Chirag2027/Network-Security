@@ -17,6 +17,7 @@ class TrainingPipelineConfig:
         self.timestamp: str = timestamp
 
 # To get All Configuration Information
+# DATA INGESTION STEP : involves loading and splitting data for training and testing.
 class DataIngestionConfig:
     def __init__(self, training_pipeline_config:TrainingPipelineConfig):
         self.data_ingestion_dir: str = os.path.join(

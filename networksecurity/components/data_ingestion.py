@@ -11,6 +11,9 @@ import numpy as np
 from typing import List
 from sklearn.model_selection import train_test_split
 
+# To get the Output Data Ingestion Artifact(train_path, test_path) after Data Ingestion Componet
+from networksecurity.entity.artifact_entity import DataIngestionArtifact
+
 # Read data from MongoDB 
 from dotenv import load_dotenv
 load_dotenv()
@@ -33,7 +36,7 @@ class DataIngestion:
         try:
             database_name = self.data_ingestion_config.database_name 
             collection_name = self.data_ingestion_config.collection_name
-            self.mongo_client = pymongo.MongoClient(MONGO_DB_URL)
+            self.mongo_client = pymongo.MongoClient(MONGO_DB_URL, serverSelectionTimeoutMS=60000)
             collection = self.mongo_client[database_name][collection_name]
 
             df = pd.DataFrame(list(collection.find()))
@@ -42,6 +45,8 @@ class DataIngestion:
                 df = df.drop(columns=["_id"], axis=1)
 
             df.replace({"na": np.nan}, inplace=True)
+
+            return df
 
         except Exception as e:
             raise NetworkSecurityException(e, sys)
@@ -61,7 +66,7 @@ class DataIngestion:
             raise NetworkSecurityException(e, sys)
 
     # Split the Data
-    def split_data_as_train_test(self, data: pd.DataFrame):
+    def split_data_as_train_test(self, dataframe: pd.DataFrame):
         try:
             # Split the data into training and testing sets
             train_set, test_set, = train_test_split(dataframe, test_size=self.data_ingestion_config.train_test_split_ratio)
@@ -90,6 +95,10 @@ class DataIngestion:
             dataframe = self.export_collection_as_dataframe()
             dataframe = self.export_data_into_feature_store(dataframe)
             self.split_data_as_train_test(dataframe)
+
+            # Get the O/P after Data Ingestion component as train_path, test_path
+            dataingestionartifact = DataIngestionArtifact(trained_file_path=self.data_ingestion_config.training_file_path, test_file_path=self.data_ingestion_config.testing_file_path)
+            return dataingestionartifact   # Final O/P of Data Ingestion component
 
         except Exception as e:
             raise NetworkSecurityException(e, sys)

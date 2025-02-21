@@ -9,7 +9,7 @@ import os, sys
 # Read the schema from data_schema folder{schema.yaml}, and compare that schema with the data coming for training
 # I am just checking the validity of data
 from networksecurity.constant.training_pipeline import SCHEMA_FILE_PATH
-from networksecurity.utils.main_utils.utils import read_yaml_file
+from networksecurity.utils.main_utils.utils import read_yaml_file, write_yaml_file
 
 class DataValidation:
     def __init__(self, data_ingestion_artifact: DataIngestionArtifact, data_validation_config: DataValidationConfig):
@@ -21,7 +21,114 @@ class DataValidation:
 
         except Exception as e:
             raise NetworkSecurityException(e, sys)
+
+    # Function to read the data
+    @staticmethod
+    def read_data(file_path) -> pd.DataFrame:
+        try:
+            return pd.read_csv(file_path)
         
+        except Exception as e:
+            raise NetworkSecurityException(e, sys)
+
+    # checking the validity of the data
+    def validate_number_of_columns(self, dataframe: pd.DataFrame) -> bool:
+        try:
+            number_of_columns = len(self._schema_config)
+            logging.info(f"Required number of columns: {number_of_columns}")
+            logging.info(f"Dataframe has columns: {len(dataframe.columns)}")
+
+            if(len(dataframe.columns) == number_of_columns) : 
+                return True
+            else: 
+                False
+
+        except Exception as e:
+            raise NetworkSecurityException(e, sys)
+
+    # Checking whether there is data drift or not
+    # base_df -> dataset that I am using for refernece
+    # current_df -> dataset that is coming over here
+    def detect_dataset_drift(self, base_df, current_df, threshold=0.05) -> bool:
+        try:
+            status = True   ## By default, assume no drift
+            report = {}
+            for column in base_df.columns:
+                d1 = base_df[column]
+                d2 = current_df[column]
+                # compare the districution of 2 samples
+                is_same_dist= ks_2samp(d1, d2)
+                if threshold <= is_same_dist.pvalue:
+                    is_found = False    # No drift detected
+                else:
+                    is_found = True     # Drift detected
+                    status = False      # Change status to False since drift is found
+
+                # update the report
+                report.update({column: {
+                    "p_value" : float(is_same_dist.pvalue),
+                    "drift_status": is_found
+                }})
+
+            # save the drift report as yaml
+            drift_report_file_path = self.data_validation_config.drift_report_file_path
+            
+            # create directory
+            # Retrieves the file path where the drift report should be saved.
+            dir_path = os.path.dirname(drift_report_file_path)
+            os.makedirs(dir_path, exist_ok=True)
+            write_yaml_file(file_path=drift_report_file_path, content=report)
+
+        except Exception as e:
+            raise NetworkSecurityException(e, sys)
+        
+    # Initiating data validation
+    def initiate_data_validation(self) -> DataValidationArtifact:
+        try:
+            # get the info. from data ingestion artifact
+            train_file_path = self.data_ingestion_artifact.trained_file_path
+            test_file_path = self.data_ingestion_artifact.test_file_path
+
+            # Read the data from train & test files
+            train_dataframe = DataValidation.read_data(train_file_path)
+            test_dataframe = DataValidation.read_data(test_file_path)
+
+            # Now checking the validity of data {checking the schema}
+            # Validate number of columns
+            status = self.validate_number_of_columns(dataframe=train_dataframe)
+            if not status:
+                error_message = f"Train dataframe does not contain all columns.\n"
+
+            status = self.validate_number_of_columns(dataframe=test_dataframe)
+            if not status:
+                error_message = f"Test dataframe does not contain all columns.\n"
+
+            # Let's check Data Drift
+            status = self.detect_dataset_drift(base_df=train_dataframe, current_df=test_dataframe)
+            dir_path = os.path.dirname(self.data_validation_config.valid_train_file_path)
+            os.makedirs(dir_path, exist_ok=True)
+
+            train_dataframe.to_csv(
+                self.data_validation_config.valid_train_file_path, index=False, header=True
+            )
+
+            test_dataframe.to_csv(
+                self.data_validation_config.valid_test_file_path, index=False, header=True
+            )
+
+            data_validation_artifact = DataValidationArtifact(
+                validation_status = status,
+                valid_train_file_path = self.data_ingestion_artifact.trained_file_path,
+                valid_test_file_path = self.data_ingestion_artifact.test_file_path,
+                invalid_train_file_path = None,
+                invalid_test_file_path = None,
+                drift_report_file_path = self.data_validation_config.drift_report_file_path
+            )
+
+            return data_validation_artifact
+
+        except Exception as e:
+            raise NetworkSecurityException(e, sys)
 
 
 

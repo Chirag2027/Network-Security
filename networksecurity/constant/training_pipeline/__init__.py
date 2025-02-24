@@ -43,7 +43,7 @@ Data Transformation related constants starts with DATA_VALIDATION VAR NAME
 """
 
 DATA_TRANSFORMATION_DIR_NAME: str = "data_transformation"
-DATA_TRANSFORMATION_TRANSFORMED_DIR_NAME: str = "transformed"
+DATA_TRANSFORMATION_TRANSFORMED_DATA_DIR: str = "transformed"
 DATA_TRANSFORMATION_TRANSFORMED_OBJECT_NAME: str = "transformed_object"
 
 # K-NN Imputer for Missing Values {replace NaN Values}
@@ -52,6 +52,8 @@ DATA_TRANSFORMATION_IMPUTER_PARAMS: dict = {
     "n_neighbors": 3, 
     "weights": "uniform"
 }
+
+PREPROCESSING_OBJECT_FILE_NAME: str = "preprocessing.pkl"
 
 
 

@@ -6,8 +6,8 @@ from networksecurity.logging.logger import logging
 from networksecurity.exception.exception import NetworkSecurityException
 import pickle
 import numpy as np
-from sklearn.model_selection import GridSearchCV
-from sklearn.metrics import r2_score
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.metrics import r2_score, accuracy_score
 # import dill
 
 # Function to read yaml file
@@ -88,7 +88,7 @@ def load_numpy_array_data(file_path: str) -> np.array:
         raise NetworkSecurityException(e, sys)
 
 # Function for Model evaluation
-def evaluate_models(x_train, y_train, x_test, y_test, models, param):
+def evaluate_models(x_train, y_train, x_test, y_test, models):
     try:
         report = {}
 
@@ -96,22 +96,16 @@ def evaluate_models(x_train, y_train, x_test, y_test, models, param):
         #     model = list(models.values())[i]
         #     para = param[model]
 
-        for model_name, model in models.items():  # ✅ Iterate over model names
-            para = param.get(model_name, {})
-
-            gs = GridSearchCV(model, para, cv=3)
-            gs.fit(x_train, y_train)
-
-            model.set_params(**gs.best_params_)
-            model.fit(x_train, y_train)
+        for model_name, model in models.items():
+            model.fit(x_train, y_train)  # Train the model
 
             y_train_pred = model.predict(x_train)
             y_test_pred = model.predict(x_test)
 
-            train_model_score = r2_score(y_train, y_train_pred)
-            test_model_score = r2_score(y_test, y_test_pred)
+            train_model_score = accuracy_score(y_train, y_train_pred)  # Classification accuracy
+            test_model_score = accuracy_score(y_test, y_test_pred)
 
-            report[model_name] = test_model_score
+            report[model_name] = test_model_score  # Store test accuracy in the report
         
         return report
 

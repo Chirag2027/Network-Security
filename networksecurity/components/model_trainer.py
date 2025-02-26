@@ -19,6 +19,8 @@ from sklearn.ensemble import (
     GradientBoostingClassifier
 )
 from sklearn.metrics import r2_score
+import mlflow
+
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig, data_transformation_artifact: DataTransformationArtifact):
@@ -27,7 +29,19 @@ class ModelTrainer:
             self.data_transformation_artifact = data_transformation_artifact
 
         except Exception as e:
-            raise NetworkSecurityException(e, sys) from e
+            raise NetworkSecurityException(e, sys) 
+    
+    def track_mlflow(self, best_model, classificationmetric):
+        with mlflow.start_run():
+            f1_score = classificationmetric.f1_score
+            precision_score = classificationmetric.precision_score
+            recall_score = classificationmetric.recall_score
+
+            mlflow.log_metric("f1_score", f1_score)
+            mlflow.log_metric("precision", precision_score)
+            mlflow.log_metric("recall", recall_score)
+            mlflow.sklearn.log_model(best_model, "model")
+
 
     # Model training, hyper parameter tuning and model evaluation
     def train_model(self, x_train, y_train, x_test, y_test):
@@ -42,41 +56,41 @@ class ModelTrainer:
         }
 
         # For Hyper-Parameter Tuning
-        params={
-            "Decision Tree": {
-                'criterion':['gini', 'entropy', 'log_loss'],
-                'splitter':['best','random']
-                # 'max_features':['sqrt','log2'],
-            },
-            "Random Forest":{
-                # 'criterion':['gini', 'entropy', 'log_loss'],
-                'max_features':['sqrt','log2',None],
-                'n_estimators': [8,16,32,128,256]
-            },
-            "Gradient Boosting":{
-                # 'loss':['log_loss', 'exponential'],
-                'learning_rate':[.1,.01,.05,.001],
-                'subsample':[0.6,0.7,0.75,0.85,0.9],
-                # 'criterion':['squared_error', 'friedman_mse'],
-                # 'max_features':['auto','sqrt','log2'],
-                'n_estimators': [8,16,32,64,128,256]
-            },
-            "Logistic Regression":{},
-            "AdaBoost":{
-                'learning_rate':[.1,.01,.001],
-                'n_estimators': [8,16,32,64,128,256]
-            }
-            # "K-Neighbors": {
-            #     # 'n_neighbors': [3, 5, 7, 9, 11, 15],  
-            #     # 'weights': ['uniform', 'distance'],   
-            #     # 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],  
-            #     'leaf_size': [10, 20, 30, 40, 50],    
-            #     # 'p': [1, 2]  
-            # }
-        }
+        # params={
+        #     "Decision Tree": {
+        #         'criterion':['gini', 'entropy', 'log_loss'],
+        #         'splitter':['best','random']
+        #         # 'max_features':['sqrt','log2'],
+        #     },
+        #     "Random Forest":{
+        #         # 'criterion':['gini', 'entropy', 'log_loss'],
+        #         'max_features':['sqrt','log2',None],
+        #         'n_estimators': [8,16,32,128,256]
+        #     },
+        #     "Gradient Boosting":{
+        #         # 'loss':['log_loss', 'exponential'],
+        #         'learning_rate':[.1,.01,.05,.001],
+        #         'subsample':[0.6,0.7,0.75,0.85,0.9],
+        #         # 'criterion':['squared_error', 'friedman_mse'],
+        #         # 'max_features':['auto','sqrt','log2'],
+        #         'n_estimators': [8,16,32,64,128,256]
+        #     },
+        #     "Logistic Regression":{},
+        #     "AdaBoost":{
+        #         'learning_rate':[.1,.01,.001],
+        #         'n_estimators': [8,16,32,64,128,256]
+        #     }
+        #     # "K-Neighbors": {
+        #     #     # 'n_neighbors': [3, 5, 7, 9, 11, 15],  
+        #     #     # 'weights': ['uniform', 'distance'],   
+        #     #     # 'algorithm': ['auto', 'ball_tree', 'kd_tree', 'brute'],  
+        #     #     'leaf_size': [10, 20, 30, 40, 50],    
+        #     #     # 'p': [1, 2]  
+        #     # }
+        # }
 
         # Training of Model and Evaluation of model
-        model_report: dict = evaluate_models(x_train, y_train, x_test, y_test, models = models, param = params)
+        model_report: dict = evaluate_models(x_train, y_train, x_test, y_test, models = models)
 
         # Getting the best model score from dictionary
         best_model_score = max(sorted(model_report.values()))
@@ -88,8 +102,12 @@ class ModelTrainer:
         classification_train_metric = get_classification_score(y_true=y_train, y_pred=y_train_pred)
         # This "classification_train_metric" will be used in logging og MLFLOW experiments 
 
-        y_test_pred = best_model.predict(y_test)
+        # Function to Track the experiments with MlFLOW
+        self.track_mlflow(best_model, classification_train_metric)
+
+        y_test_pred = best_model.predict(x_test)
         classification_test_metric = get_classification_score(y_true=y_test, y_pred=y_test_pred)
+        self.track_mlflow(best_model, classification_test_metric)
 
         preprocessor = load_object(file_path=self.data_transformation_artifact.transformed_object_file_path)
         model_dir_path = os.path.dirname(self.model_trainer_config.trained_model_file_path)
@@ -105,8 +123,7 @@ class ModelTrainer:
         logging.info(f"Model Trainer Artifact: {model_trainer_artifact}")
         return model_trainer_artifact
 
-
-    # Function to Track the MlFLOW
+        
 
 
     def initiate_model_trainer(self) ->  ModelTrainerArtifact:

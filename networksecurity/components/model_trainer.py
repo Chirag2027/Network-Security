@@ -19,8 +19,10 @@ from sklearn.ensemble import (
     GradientBoostingClassifier
 )
 from sklearn.metrics import r2_score
-import mlflow
 
+import mlflow
+import dagshub
+dagshub.init(repo_owner='chirag.yep', repo_name='Network-Security', mlflow=True)
 
 class ModelTrainer:
     def __init__(self, model_trainer_config: ModelTrainerConfig, data_transformation_artifact: DataTransformationArtifact):

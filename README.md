@@ -8,3 +8,13 @@ Network Security System is a powerful, end-to-end machine learning solution desi
 - Scalability: Utilize AWS services to efficiently process large-scale network traffic and logs.
 - Storage & Accessibility: Securely store logs, training data, and model artifacts using Amazon S3 for easy access and management.
 
+# Technology Stack Used
+- Python
+- FastAPI
+- MLflow
+- AWS Services
+- Scikit-Learn
+- DagsHub
+- Git
+- HTML
+- Docker
